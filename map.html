@@ -35,7 +35,8 @@
         <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
         integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
         crossorigin=""></script>
-        <script src="FileSaver.js"></script>
+        <script type="text/javascript" src="FileSaver.js"></script>
+        <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
         <script type="text/javascript">
             // On initialise la latitude et la longitude de Paris (centre de la carte)
             var Paris = [48.852969, 2.349903];
@@ -49,7 +50,7 @@
             var gpx1;
             var gpx2;
             var marker;
-
+            var city;
 
 
             // Fonction d'initialisation de la carte
@@ -77,7 +78,30 @@
                     circle1 = drawCircle(e.latlng.lat, e.latlng.lng, R1, '#00f');
                     circle2 = drawCircle(e.latlng.lat, e.latlng.lng, R2, '#f03');
                     marker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(macarte);
-                    marker.bindTooltip(e.latlng.lat.toFixed(6)+", "+e.latlng.lng.toFixed(6), { permanent: true, offset: [0, 0] });
+                    city = '';
+                    //$.get('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+e.latlng.lat+'&lon='+e.latlng.lng,
+                    $.ajax({
+                        async: false,
+                        type: 'GET',
+                        url: 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+e.latlng.lat+'&lon='+e.latlng.lng,
+                        success: function(data){
+							if (typeof data.address.town != 'undefined') {
+								city = data.address.town;
+							} else if (typeof data.address.village != 'undefined') {
+								city = data.address.village;
+							} else if (typeof data.address.city != 'undefined') {
+								city = data.address.city;
+							} else if (typeof data.address.municipality != 'undefined') {
+								city = data.address.municipality;
+							}
+                        }
+                    });
+                    var tooltip = e.latlng.lat.toFixed(6)+", "+e.latlng.lng.toFixed(6);
+                    console.log('city 2: '+city);
+                    if (city != '') {
+                        tooltip = '<center>' + city + '</center>' + tooltip;
+                    }
+                    marker.bindTooltip(tooltip, { permanent: true, offset: [0, 0] });
                     marker.bindPopup('<label>Export GPX file ?</label></br>'+
                     '<center><button onclick=WriteToFile()>OK</button></center>',{
                     keepInView: true,
