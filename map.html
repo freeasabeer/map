@@ -4,36 +4,26 @@
         <meta charset="utf-8">
         <!-- Nous chargeons les fichiers CDN de Leaflet. Le CSS AVANT le JS -->
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
-   integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
-   crossorigin=""/>
+        integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+        crossorigin=""/>
         <style type="text/css">
-i.map-wrapper {
-  position: relative;
-}
-
+            i.map-wrapper {
+                position: relative;
+            }
             #map{ /* la carte DOIT avoir une hauteur sinon elle n'apparaît pas */
                 //height:400px;
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
+                position: absolute;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                left: 0;
             }
-.map-wrapper {
-  position: relative;
-}
-
-#map {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-}
-
-<div class="map-wrapper">
-  <div id="map"></div>
-</div>
+            .map-wrapper {
+                position: relative;
+            }
+            <div class="map-wrapper">
+              <div id="map"></div>
+            </div>
         </style>
         <title>Carte</title>
     </head>
@@ -41,24 +31,30 @@ i.map-wrapper {
         <div id="map">
         <!-- Ici s'affichera la carte -->
     </div>
-
         <!-- Fichiers Javascript -->
         <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
-   integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
-   crossorigin=""></script>
-    <script type="text/javascript">
+        integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+        crossorigin=""></script>
+        <script src="FileSaver.js"></script>
+        <script type="text/javascript">
             // On initialise la latitude et la longitude de Paris (centre de la carte)
             var Paris = [48.852969, 2.349903];
             var Moulins = [46.513515, 3.142089];
             var centre = Moulins;
             var macarte = null;
+            var R1 = 10000;
+            var R2 = 30000;
             var circle1;
             var circle2;
+            var gpx1;
+            var gpx2;
             var marker;
+
+
+
             // Fonction d'initialisation de la carte
             function initMap() {
                 // Créer l'objet "macarte" et l'insèrer dans l'élément HTML qui a l'ID "map"
-                //macarte = L.map('map').setView([lat, lon], 11);
                 macarte = L.map('map').setView(centre, 6);                
                 // Leaflet ne récupère pas les cartes (tiles) sur un serveur par défaut. Nous devons lui préciser où nous souhaitons les récupérer. Ici, openstreetmap.fr
                 L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
@@ -67,22 +63,82 @@ i.map-wrapper {
                     minZoom: 1,
                     maxZoom: 20
                 }).addTo(macarte);
-macarte.on('click', function(e) {
-        if (circle1 != undefined) {
-            macarte.removeLayer(circle1);
-        }
-        if (circle2 != undefined) {
-            macarte.removeLayer(circle2);
-        }
-        if (marker != undefined) {
-            macarte.removeLayer(marker);
-        }
-        circle1 = drawCircle(e.latlng.lat, e.latlng.lng, 10000, '#00f');
-        circle2 = drawCircle(e.latlng.lat, e.latlng.lng, 30000, '#f03');
-        marker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(macarte);
-        marker.bindPopup(e.latlng.lat.toFixed(6)+", "+e.latlng.lng.toFixed(6)).openPopup();
-});
+
+                macarte.on('click', function(e) {
+                    if (circle1 != undefined) {
+                        macarte.removeLayer(circle1);
+                    }
+                    if (circle2 != undefined) {
+                        macarte.removeLayer(circle2);
+                    }
+                    if (marker != undefined) {
+                        macarte.removeLayer(marker);
+                    }
+                    circle1 = drawCircle(e.latlng.lat, e.latlng.lng, R1, '#00f');
+                    circle2 = drawCircle(e.latlng.lat, e.latlng.lng, R2, '#f03');
+                    marker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(macarte);
+                    marker.bindTooltip(e.latlng.lat.toFixed(6)+", "+e.latlng.lng.toFixed(6), { permanent: true, offset: [0, 0] });
+                    marker.bindPopup('<label>Export GPX file ?</label></br>'+
+                    '<center><button onclick=WriteToFile()>OK</button></center>',{
+                    keepInView: true,
+                    closeButton: false
+                    }).openPopup();
+                    gpx1 = calcule_cercle([e.latlng.lat, e.latlng.lng], R1);
+                    gpx2 = calcule_cercle([e.latlng.lat, e.latlng.lng], R2);
+                });
+            } // end initMap
+
+
+
+            function WriteToFile(passform) {
+                var gpxstring;
+                gpxstring  = '<?xml version=\'1.0\' encoding=\'UTF-8\' standalone=\'yes\' ?>\n';
+                gpxstring += '<gpx version=\"1.1\" creator=\"Olivier\" xmlns=\"http://www.topografix.com/GPX/1/1\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd\">\n';
+                gpxstring += '  <metadata>\n';
+                gpxstring += '    <name>cercle ' + centre + ' ' + R1 + 'km et ' + R2 + 'km</name>\n';
+                gpxstring += '  </metadata>\n';
+                gpxstring += '  <trk>\n';
+                gpxstring += '    <name>cercle ' + centre + ' ' + R1 + 'km</name>\n';
+                gpxstring += '    <trkseg>\n';
+                gpx1.forEach(function (item, index) {
+                    gpxstring += '      <trkpt lat=\"' + item[0] + '\" lon=\"' + item[1] + '\"></trkpt>\n';
+                });
+                gpxstring += '    </trkseg>\n';
+                gpxstring += '  <trk>\n';
+                gpxstring += '    <name>cercle ' + centre + ' ' + R2 + 'km</name>\n';
+                gpxstring += '    <trkseg>\n';
+                gpx2.forEach(function (item, index) {
+                    gpxstring += '      <trkpt lat=\"' + item[0] + '\" lon=\"' + item[1] + '\"></trkpt>\n';
+                });
+                gpxstring += '    </trkseg>\n';
+                gpxstring += '  </trk>\n';
+                gpxstring += '</gpx>\n';
+                var blob = new Blob([gpxstring], {type: "text/plain;charset=utf-8"});
+                saveAs(blob, "cercle.gpx");
+                delete blob, gpxstring;
             }
+
+
+
+            function calcule_cercle(pos, d) {
+                var R = 6371000; //rayon terrestre moyen en mètre
+                var Center_Latitude = Math.PI*pos[0]/180.0; // degree to radian
+                var Center_Longitude = Math.PI*pos[1]/180.0; // degree to radian
+                var cercle = [];
+                for (i=0; i<=2*360; i++) {
+                    var brng = Math.PI*i/2.0/180.0;
+                    var PointCercle_Latitude = Math.asin(Math.sin(Center_Latitude)*Math.cos(d/R) + Math.cos(Center_Latitude)*Math.sin(d/R)*Math.cos(brng));
+                    var PointCercle_Longitude = Center_Longitude + Math.atan2(Math.sin(brng)*Math.sin(d/R)*Math.cos(Center_Latitude), Math.cos(d/R)-Math.sin(Center_Latitude)*Math.sin(PointCercle_Latitude));
+                    PointCercle_Latitude = 180.0*PointCercle_Latitude/Math.PI; // radian to degree
+                    PointCercle_Longitude = 180.0*PointCercle_Longitude/Math.PI; //radian to degree
+                    cercle.push([PointCercle_Latitude, PointCercle_Longitude]);
+                }
+                //var polygon = L.polygon(cercle).addTo(macarte);
+                return cercle;
+            }
+
+
+
             function drawCircle(lat, lon, rad, colour) {
                 var circle = L.circle([lat, lon], {
                     color: colour,
@@ -92,11 +148,12 @@ macarte.on('click', function(e) {
                     }).addTo(macarte);
                 return circle
             }
+
+
+
             window.onload = function(){
-        // Fonction d'initialisation qui s'exécute lorsque le DOM est chargé
-        initMap(); 
-        //drawCircle(lat, lon, 10000, '#00f');
-        //drawCircle(lat, lon, 30000, '#f03');
+                // Fonction d'initialisation qui s'exécute lorsque le DOM est chargé
+                initMap(); 
             };
         </script>
     </body>
