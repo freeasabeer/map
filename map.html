@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <!-- Nous chargeons les fichiers CDN de Leaflet. Le CSS AVANT le JS -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+   integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+   crossorigin=""/>
+        <style type="text/css">
+i.map-wrapper {
+  position: relative;
+}
+
+            #map{ /* la carte DOIT avoir une hauteur sinon elle n'apparaît pas */
+                //height:400px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+            }
+.map-wrapper {
+  position: relative;
+}
+
+#map {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+<div class="map-wrapper">
+  <div id="map"></div>
+</div>
+        </style>
+        <title>Carte</title>
+    </head>
+    <body>
+        <div id="map">
+        <!-- Ici s'affichera la carte -->
+    </div>
+
+        <!-- Fichiers Javascript -->
+        <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+   integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+   crossorigin=""></script>
+    <script type="text/javascript">
+            // On initialise la latitude et la longitude de Paris (centre de la carte)
+            var Paris = [48.852969, 2.349903];
+            var Moulins = [46.513515, 3.142089];
+            var centre = Moulins;
+            var macarte = null;
+            var circle1;
+            var circle2;
+            var marker;
+            // Fonction d'initialisation de la carte
+            function initMap() {
+                // Créer l'objet "macarte" et l'insèrer dans l'élément HTML qui a l'ID "map"
+                //macarte = L.map('map').setView([lat, lon], 11);
+                macarte = L.map('map').setView(centre, 6);                
+                // Leaflet ne récupère pas les cartes (tiles) sur un serveur par défaut. Nous devons lui préciser où nous souhaitons les récupérer. Ici, openstreetmap.fr
+                L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
+                    // Il est toujours bien de laisser le lien vers la source des données
+                    attribution: 'données © <a href="//osm.org/copyright">OpenStreetMap</a>/ODbL - rendu <a href="//openstreetmap.fr">OSM France</a>',
+                    minZoom: 1,
+                    maxZoom: 20
+                }).addTo(macarte);
+macarte.on('click', function(e) {
+        if (circle1 != undefined) {
+            macarte.removeLayer(circle1);
+        }
+        if (circle2 != undefined) {
+            macarte.removeLayer(circle2);
+        }
+        if (marker != undefined) {
+            macarte.removeLayer(marker);
+        }
+        circle1 = drawCircle(e.latlng.lat, e.latlng.lng, 10000, '#00f');
+        circle2 = drawCircle(e.latlng.lat, e.latlng.lng, 30000, '#f03');
+        marker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(macarte);
+        marker.bindPopup(e.latlng.lat.toFixed(6)+", "+e.latlng.lng.toFixed(6)).openPopup();
+});
+            }
+            function drawCircle(lat, lon, rad, colour) {
+                var circle = L.circle([lat, lon], {
+                    color: colour,
+                    fillColor: colour,
+                    fillOpacity: 0.2,
+                    radius: rad
+                    }).addTo(macarte);
+                return circle
+            }
+            window.onload = function(){
+        // Fonction d'initialisation qui s'exécute lorsque le DOM est chargé
+        initMap(); 
+        //drawCircle(lat, lon, 10000, '#00f');
+        //drawCircle(lat, lon, 30000, '#f03');
+            };
+        </script>
+    </body>
+</html>
