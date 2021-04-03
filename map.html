@@ -36,21 +36,19 @@
         integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
         crossorigin=""></script>
         <script type="text/javascript" src="FileSaver.js"></script>
-        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.8/jquery.min.js"></script>
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
         <script type="text/javascript">
             // On initialise la latitude et la longitude de Paris (centre de la carte)
             var Paris = [48.852969, 2.349903];
             var Moulins = [46.513515, 3.142089];
             var centre = Moulins;
+            var curpos;
             var macarte = null;
             var R1 = 10000;
             var R2 = 30000;
             var circle1;
             var circle2;
-            var gpx1;
-            var gpx2;
             var marker;
-            var city;
 
 
             // Fonction d'initialisation de la carte
@@ -75,40 +73,38 @@
                     if (marker != undefined) {
                         macarte.removeLayer(marker);
                     }
-                    circle1 = drawCircle(e.latlng.lat, e.latlng.lng, R1, '#00f');
-                    circle2 = drawCircle(e.latlng.lat, e.latlng.lng, R2, '#f03');
-                    marker = L.marker([e.latlng.lat, e.latlng.lng]).addTo(macarte);
-                    city = '';
-                    //$.get('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+e.latlng.lat+'&lon='+e.latlng.lng,
-                    $.ajax({
-                        async: false,
-                        type: 'GET',
-                        url: 'https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+e.latlng.lat+'&lon='+e.latlng.lng,
-                        success: function(data){
-							if (typeof data.address.town != 'undefined') {
-								city = data.address.town;
-							} else if (typeof data.address.village != 'undefined') {
-								city = data.address.village;
-							} else if (typeof data.address.city != 'undefined') {
-								city = data.address.city;
-							} else if (typeof data.address.municipality != 'undefined') {
-								city = data.address.municipality;
-							}
-                        }
-                    });
-                    var tooltip = e.latlng.lat.toFixed(6)+", "+e.latlng.lng.toFixed(6);
-                    console.log('city 2: '+city);
-                    if (city != '') {
-                        tooltip = '<center>' + city + '</center>' + tooltip;
-                    }
-                    marker.bindTooltip(tooltip, { permanent: true, offset: [0, 0] });
+                    cur_pos = [e.latlng.lat, e.latlng.lng];
+                    circle1 = drawCircle(cur_pos, R1, 'green');
+                    circle2 = drawCircle(cur_pos, R2, '#f03');
+                    marker = L.marker(cur_pos).addTo(macarte);
+
+                    var tooltiptext = e.latlng.lat.toFixed(6)+", "+e.latlng.lng.toFixed(6);
+                    var city = '';
+
+                    $.get('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+e.latlng.lat+'&lon='+e.latlng.lng,
+                    function(data){
+                        //console.log(data.address);
+						if (typeof data.address.town != 'undefined') {
+							city = data.address.town;
+						} else if (typeof data.address.village != 'undefined') {
+							city = data.address.village;
+						} else if (typeof data.address.city != 'undefined') {
+							city = data.address.city;
+						} else if (typeof data.address.municipality != 'undefined') {
+							city = data.address.municipality;
+						}
+						if (city != '') {
+						  tooltiptext = '<center>' + city + '</center>' + tooltiptext;
+						  marker.setTooltipContent(tooltiptext);
+						}
+					});
+
+                    marker.bindTooltip(tooltiptext, { permanent: true, offset: [0, 0] });
                     marker.bindPopup('<label>Export GPX file ?</label></br>'+
                     '<center><button onclick=WriteToFile()>OK</button></center>',{
-                    keepInView: true,
+                    keepInView: false,
                     closeButton: false
                     }).openPopup();
-                    gpx1 = calcule_cercle([e.latlng.lat, e.latlng.lng], R1);
-                    gpx2 = calcule_cercle([e.latlng.lat, e.latlng.lng], R2);
                 });
             } // end initMap
 
@@ -124,14 +120,16 @@
                 gpxstring += '  <trk>\n';
                 gpxstring += '    <name>cercle ' + centre + ' ' + R1 + 'km</name>\n';
                 gpxstring += '    <trkseg>\n';
-                gpx1.forEach(function (item, index) {
+                var gpx = calcule_cercle(cur_pos, R1);
+                gpx.forEach(function (item, index) {
                     gpxstring += '      <trkpt lat=\"' + item[0] + '\" lon=\"' + item[1] + '\"></trkpt>\n';
                 });
                 gpxstring += '    </trkseg>\n';
                 gpxstring += '  <trk>\n';
                 gpxstring += '    <name>cercle ' + centre + ' ' + R2 + 'km</name>\n';
                 gpxstring += '    <trkseg>\n';
-                gpx2.forEach(function (item, index) {
+                gpx = calcule_cercle(cur_pos, R2);
+                gpx.forEach(function (item, index) {
                     gpxstring += '      <trkpt lat=\"' + item[0] + '\" lon=\"' + item[1] + '\"></trkpt>\n';
                 });
                 gpxstring += '    </trkseg>\n';
@@ -139,7 +137,8 @@
                 gpxstring += '</gpx>\n';
                 var blob = new Blob([gpxstring], {type: "text/plain;charset=utf-8"});
                 saveAs(blob, "cercle.gpx");
-                delete blob, gpxstring;
+                marker.closePopup();
+                delete blob, gpxstring, gpx;
             }
 
 
@@ -163,8 +162,8 @@
 
 
 
-            function drawCircle(lat, lon, rad, colour) {
-                var circle = L.circle([lat, lon], {
+            function drawCircle(pos, rad, colour) {
+                var circle = L.circle(pos, {
                     color: colour,
                     fillColor: colour,
                     fillOpacity: 0.2,
