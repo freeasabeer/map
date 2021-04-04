@@ -6,6 +6,8 @@
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
         integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
         crossorigin=""/>
+		<link rel="stylesheet" href="leaflet.toolbar/leaflet.toolbar.css"/>
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css"/>
         <style type="text/css">
             i.map-wrapper {
                 position: relative;
@@ -35,14 +37,15 @@
         <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
         integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
         crossorigin=""></script>
-        <script type="text/javascript" src="FileSaver.js"></script>
+        <script type="text/javascript" src="FileSaver/FileSaver.js"></script>
         <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+        <script src="leaflet.toolbar/leaflet.toolbar.js"></script>
         <script type="text/javascript">
             // On initialise la latitude et la longitude de Paris (centre de la carte)
             var Paris = [48.852969, 2.349903];
             var Moulins = [46.513515, 3.142089];
             var centre = Moulins;
-            var curpos;
+            var curpos = null;
             var macarte = null;
             var R = [10000, 30000];
             var color = ['green', '#f03', '#30f'];
@@ -62,6 +65,23 @@
                     maxZoom: 20
                 }).addTo(macarte);
 
+                var SaveToGpxAction = L.Toolbar2.Action.extend({
+                    options: {
+                        toolbarIcon: {
+                            className: 'fa fa-download',
+                            tooltip: 'Export to GPX'
+                        }
+                    },
+   					addHooks: function () {
+						if (curpos != null) {WriteToFile()};
+					}
+				});
+                
+                new L.Toolbar2.Control({
+                    position: 'topleft',
+	                actions: [SaveToGpxAction]
+                }).addTo(macarte);
+
                 macarte.on('click', function(e) {
                     circle.forEach(function (item, index) {
                         if (item != undefined) {
@@ -72,11 +92,11 @@
                     if (marker != undefined) {
                         macarte.removeLayer(marker);
                     }
-                    cur_pos = [e.latlng.lat, e.latlng.lng];
+                    curpos = [e.latlng.lat, e.latlng.lng];
                     R.forEach(function (item, index) {
-                        circle.push(drawCircle(cur_pos, item, color[index]));
+                        circle.push(drawCircle(curpos, item, color[index]));
                     });
-                    marker = L.marker(cur_pos).addTo(macarte);
+                    marker = L.marker(curpos).addTo(macarte);
 
                     var tooltiptext = e.latlng.lat.toFixed(6)+", "+e.latlng.lng.toFixed(6);
                     var city = '';
@@ -100,24 +120,24 @@
 					});
 
                     marker.bindTooltip(tooltiptext, { permanent: false, offset: [0, 0] });
-                    marker.bindPopup('<label>Export GPX file ?</label></br>'+
-                    '<center><button onclick=WriteToFile()>OK</button></center>',{
-                    keepInView: false,
-                    closeButton: false
-                    }).openPopup();
-                    macarte.setView(cur_pos,10);
+                    //marker.bindPopup('<label>Export GPX file ?</label></br>'+
+                    //'<center><button onclick=WriteToFile()>OK</button></center>',{
+                    //keepInView: false,
+                    //closeButton: false
+                    //}).openPopup();
+                    macarte.setView(curpos,10);
                 });
             } // end initMap
 
 
 
-            function WriteToFile(passform) {
+            function WriteToFile() {
                 var gpxstring;
                 gpxstring  = '<?xml version=\'1.0\' encoding=\'UTF-8\' standalone=\'yes\' ?>\n';
                 gpxstring += '<gpx version=\"1.1\" creator=\"Olivier\" xmlns=\"http://www.topografix.com/GPX/1/1\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd\">\n';
 
                 gpxstring += '  <metadata>\n';
-                gpxstring += '    <name>cercle ' + cur_pos[0].toFixed(6) + ',' + cur_pos[1].toFixed(6) + ' ';
+                gpxstring += '    <name>cercle ' + curpos[0].toFixed(6) + ',' + curpos[1].toFixed(6) + ' ';
                 R.forEach(function(item, index) {
                     if (index == 0) {
                         gpxstring += item/1000 + 'km';
@@ -128,15 +148,15 @@
                 gpxstring += '</name>\n';
                 gpxstring += '  </metadata>\n';
 
-                gpxstring += '  <wpt lat=\"' + cur_pos[0].toFixed(6) + '\" lon=\"' + cur_pos[1].toFixed(6) + '\">\n';
+                gpxstring += '  <wpt lat=\"' + curpos[0].toFixed(6) + '\" lon=\"' + curpos[1].toFixed(6) + '\">\n';
                 gpxstring += '    <name>Center</name>\n';
                 gpxstring += '  </wpt>\n';
 
                 R.forEach(function(item, index) {
                     gpxstring += '  <trk>\n';
-                    gpxstring += '    <name>cercle ' + cur_pos[0].toFixed(6) + ',' + cur_pos[1].toFixed(6) + ' ' + item/1000 + 'km</name>\n';
+                    gpxstring += '    <name>cercle ' + curpos[0].toFixed(6) + ',' + curpos[1].toFixed(6) + ' ' + item/1000 + 'km</name>\n';
                     gpxstring += '    <trkseg>\n';
-                    var gpx = calcule_cercle(cur_pos, item);
+                    var gpx = calcule_cercle(curpos, item);
                     gpx.forEach(function (item, index) {
                         gpxstring += '      <trkpt lat=\"' + item[0] + '\" lon=\"' + item[1] + '\"></trkpt>\n';
                     });
@@ -147,7 +167,7 @@
                 gpxstring += '</gpx>\n';
 
                 var blob = new Blob([gpxstring], {type: "text/plain;charset=utf-8"});
-                var filename = 'cercle_' + cur_pos[0].toFixed(6) + '_' + cur_pos[1].toFixed(6);
+                var filename = 'cercle_' + curpos[0].toFixed(6) + '_' + curpos[1].toFixed(6);
                 R.forEach(function(item, index) {
                     filename += '_' + item/1000 + 'km';
                 });
