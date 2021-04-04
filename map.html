@@ -8,6 +8,7 @@
         crossorigin=""/>
 		<link rel="stylesheet" href="leaflet.toolbar/leaflet.toolbar.css"/>
 		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css"/>
+		<link rel="stylesheet" href="leaflet-control-window/L.Control.Window.css"/>
         <style type="text/css">
             i.map-wrapper {
                 position: relative;
@@ -28,11 +29,6 @@
             </div>
         </style>
         <title>Carte</title>
-    </head>
-    <body>
-        <div id="map">
-        <!-- Ici s'affichera la carte -->
-    </div>
         <!-- Fichiers Javascript -->
         <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
         integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
@@ -40,6 +36,13 @@
         <script type="text/javascript" src="FileSaver/FileSaver.js"></script>
         <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
         <script src="leaflet.toolbar/leaflet.toolbar.js"></script>
+        <script src="leaflet-control-window/L.Control.Window.js"></script>
+    </head>
+    <body>
+        <div id="map">
+        <!-- Ici s'affichera la carte -->
+    </div>
+
         <script type="text/javascript">
             // On initialise la latitude et la longitude de Paris (centre de la carte)
             var Paris = [48.852969, 2.349903];
@@ -51,6 +54,8 @@
             var color = ['green', '#f03', '#30f'];
             var circle = [];
             var marker;
+            var Rmax = 0;
+            var FranceBounds = [[51.071021, 2.561037], [48.420381, -4.766843], [48.966750, 8.233373], [42.335531, 2.541811]];
 
 
             // Fonction d'initialisation de la carte
@@ -65,6 +70,13 @@
                     maxZoom: 20
                 }).addTo(macarte);
 
+                // On s'assure que la France est visible dans son intégralité
+                macarte.fitBounds(L.latLngBounds(FranceBounds));
+
+                // Popup d'accueil pour expliquer comment ça marche
+                var win =  L.control.window(map,{title:'<center>Salut Homo Motardus Confinus</center>',content:'<center><div>Cliques sur la carte là où tu habites pour voir tes cercles de libertés !</div></br><div>Puis cliques sur le menu "Export GPX" en haut à</br>gauche pour exporter tes cercles dans un fichier GPX.</div></center>'}).show();
+
+                // Toolbar en haut à gauche pour l'export GPS
                 var SaveToGpxAction = L.Toolbar2.Action.extend({
                     options: {
                         toolbarIcon: {
@@ -82,6 +94,14 @@
 	                actions: [SaveToGpxAction]
                 }).addTo(macarte);
 
+                // Quel est le rayon max de la liste ?
+				R.forEach(function (item, index) {
+					if (item > Rmax) {
+						Rmax = item;
+					}
+				});
+
+                // Que fait on quand on clique sur la carte
                 macarte.on('click', function(e) {
                     circle.forEach(function (item, index) {
                         if (item != undefined) {
@@ -125,7 +145,9 @@
                     //keepInView: false,
                     //closeButton: false
                     //}).openPopup();
-                    macarte.setView(curpos,10);
+                    //macarte.setView(curpos,10);
+                    var bounds = L.latLngBounds(calcule_cercle(curpos, Rmax, 4)); // Calcul des bounds avec 4 points sur le cerle de rayon max
+                    macarte.fitBounds(bounds); // Et on zoom  pour que le plus grand cercle tienne dans la fenêtre
                 });
             } // end initMap
 
@@ -156,7 +178,7 @@
                     gpxstring += '  <trk>\n';
                     gpxstring += '    <name>cercle ' + curpos[0].toFixed(6) + ',' + curpos[1].toFixed(6) + ' ' + item/1000 + 'km</name>\n';
                     gpxstring += '    <trkseg>\n';
-                    var gpx = calcule_cercle(curpos, item);
+                    var gpx = calcule_cercle(curpos, item, 720); // 720 points -> pas de 0.5°
                     gpx.forEach(function (item, index) {
                         gpxstring += '      <trkpt lat=\"' + item[0] + '\" lon=\"' + item[1] + '\"></trkpt>\n';
                     });
@@ -178,14 +200,25 @@
             }
 
 
-
-            function calcule_cercle(pos, d) {
+            // Calcul des coordonnées GPS d'un cercle de rayon d centré sur pos
+            function calcule_cercle(pos, d, nbpoints) {
                 var R = 6371000; //rayon terrestre moyen en mètre
                 var Center_Latitude = Math.PI*pos[0]/180.0; // degree to radian
                 var Center_Longitude = Math.PI*pos[1]/180.0; // degree to radian
                 var cercle = [];
-                for (i=0; i<=2*360; i++) {
-                    var brng = Math.PI*i/2.0/180.0;
+                var factor;
+                var increment;
+
+                if (nbpoints <= 360) {
+                    factor = 1;
+                    increment = 360/nbpoints;
+                } else {
+                    factor = nbpoints/360;
+                    increment = 1;
+                }
+
+                for (i=0; i<factor*360; i+=increment) {
+                    var brng = Math.PI*i/factor/180.0;
                     var PointCercle_Latitude = Math.asin(Math.sin(Center_Latitude)*Math.cos(d/R) + Math.cos(Center_Latitude)*Math.sin(d/R)*Math.cos(brng));
                     var PointCercle_Longitude = Center_Longitude + Math.atan2(Math.sin(brng)*Math.sin(d/R)*Math.cos(Center_Latitude), Math.cos(d/R)-Math.sin(Center_Latitude)*Math.sin(PointCercle_Latitude));
                     PointCercle_Latitude = 180.0*PointCercle_Latitude/Math.PI; // radian to degree
@@ -197,7 +230,7 @@
             }
 
 
-
+            // Dessine un cercle sur la carte
             function drawCircle(pos, rad, colour) {
                 var circle = L.circle(pos, {
                     color: colour,
