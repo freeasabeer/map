@@ -6,6 +6,7 @@
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
         integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
         crossorigin=""/>
+        <link rel="stylesheet" href="leaflet-control-window/L.Control.Window.css"/>
         <style type="text/css">
             i.map-wrapper {
                 position: relative;
@@ -27,12 +28,6 @@
             </div>
         </style>
         <title>Carte</title>
-    </head>
-    <body>
-        <div id="map">
-        <!-- Ici s'affichera la carte -->
-    </div>
-
         <!-- Fichiers Javascript -->
         <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
         integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
@@ -40,6 +35,12 @@
         <script src="leaflet-providers.js"></script>
         <script src="leaflet-color-markers.js"></script>
         <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+        <script src="leaflet-control-window/L.Control.Window.js"></script>
+    </head>
+    <body>
+        <div id="map">
+        <!-- Ici s'affichera la carte -->
+    </div>
         <script type="text/javascript">
             // On initialise la latitude et la longitude de Paris (centre de la carte)
             var centre = [46.568059, 3.334417]; // Moulins, centre de la France
@@ -50,8 +51,10 @@
             var marker;
             var circle;
             var R = 10000;
+            var step = 500;
             var FranceBounds = [[51.071021, 2.561037], [48.420381, -4.766843], [48.966750, 8.233373], [42.335531, 2.541811]];
             var AllFeatureGroup;
+
             // Fonction d'initialisation de la carte
             function initMap() {
                 // Créer l'objet "macarte" et l'insèrer dans l'élément HTML qui a l'ID "map"
@@ -68,6 +71,9 @@
                 // On s'assure que la France est visible dans son intégralité
                 macarte.fitBounds(L.latLngBounds(FranceBounds));
 
+                // Popup d'accueil pour expliquer comment ça marche
+                var win =  L.control.window(macarte,{modal: 'true', title:'<center>Salut Homo Confinus</center>',content:'<center><div>Un clic droit sur la carte: ajoute un cercle</br>Un clic gauche sur un cercle: supprime le cercle</div></center>'}).show();
+
                 // Gestion du groupe qui contient tous les marqueurs et cercles
                 AllFeatureGroup = L.featureGroup();
                 AllFeatureGroup.on('layeradd layerremove', function (e) {
@@ -82,7 +88,7 @@
                 // Que fait on quand on clique sur la carte
                 macarte.on('click', function(e) {
                     curpos = [e.latlng.lat, e.latlng.lng];
-                    marker = L.marker(curpos,  {draggable:'false', icon: icons[color_index]}).addTo(macarte);
+                    marker = L.marker(curpos,  {icon: icons[color_index]}).addTo(macarte);
 
                     /*marker.on('dragend', function(e){
                         var marker = e.target;
@@ -98,7 +104,7 @@
                     color_index %= 7;
 
                     // Gestion du click droit sur l'ensemble cercle+marker
-                    feature = L.featureGroup([marker, circle]);
+                    var feature = L.featureGroup([marker, circle]);
                     macarte.addLayer(feature);
                     feature.on('contextmenu', function (e)  { 
                         macarte.removeLayer(e.target);
@@ -140,7 +146,6 @@
 
             function drawCircle(pos, rad, colour) {
                 var circle = L.circle(pos, {
-                    //draggable:'true',
                     color: colour,
                     fillColor: colour,
                     fillOpacity: 0.2,
