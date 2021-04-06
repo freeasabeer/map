@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <!-- Nous chargeons les fichiers CDN de Leaflet. Le CSS AVANT le JS -->
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+        integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+        crossorigin=""/>
+        <style type="text/css">
+            i.map-wrapper {
+                position: relative;
+            }
+
+            #map{ /* la carte DOIT avoir une hauteur sinon elle n'apparaît pas */
+                //height:400px;
+                position: absolute;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                left: 0;
+            }
+            .map-wrapper {
+                position: relative;
+            }
+            <div class="map-wrapper">
+                <div id="map"></div>
+            </div>
+        </style>
+        <title>Carte</title>
+    </head>
+    <body>
+        <div id="map">
+        <!-- Ici s'affichera la carte -->
+    </div>
+
+        <!-- Fichiers Javascript -->
+        <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+        integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+        crossorigin=""></script>
+        <script src="leaflet-providers.js"></script>
+        <script src="leaflet-color-markers.js"></script>
+        <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+        <script type="text/javascript">
+            // On initialise la latitude et la longitude de Paris (centre de la carte)
+            var centre = [46.568059, 3.334417]; // Moulins, centre de la France
+            var colors = ["#2A81CB", "#FFD326", "#CB2B3E", "#2AAD27", "#CB8427", "#CAC428", "#9C2BCB"];
+            var icons = [blueIcon, goldIcon, redIcon, greenIcon, orangeIcon, yellowIcon, violetIcon];//, greyIcon, blackIcon];
+            var color_index = 0;
+            var macarte = null;
+            var marker;
+            var circle;
+            var R = 10000;
+            var FranceBounds = [[51.071021, 2.561037], [48.420381, -4.766843], [48.966750, 8.233373], [42.335531, 2.541811]];
+            var AllFeatureGroup;
+            // Fonction d'initialisation de la carte
+            function initMap() {
+                // Créer l'objet "macarte" et l'insèrer dans l'élément HTML qui a l'ID "map"
+                macarte = L.map('map').setView(centre, 11);                
+                // Leaflet ne récupère pas les cartes (tiles) sur un serveur par défaut. Nous devons lui préciser où nous souhaitons les récupérer. Ici, openstreetmap.fr
+                // Il est toujours bien de laisser le lien vers la source des données
+                L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {attribution: 'données © <a href="//osm.org/copyright">OpenStreetMap</a>/ODbL - rendu <a href="//openstreetmap.fr">OSM France</a>', minZoom: 1, maxZoom: 20}).addTo(macarte);
+                //L.tileLayer.provider('GeoportailFrance.plan').addTo(macarte);
+                //L.tileLayer.provider('GeoportailFrance.orthos').addTo(macarte);
+                //L.tileLayer.provider('GeoportailFrance.parcels').addTo(macarte);
+                //L.tileLayer.provider('TomTom.Hybrid', {apikey: 'ju2PDVEzRzAGrn2I4hGjxAE2fseraZGB'}).addTo(macarte); // Basic (default), Hybrid, Labels
+                //L.tileLayer.provider('OpenTopoMap').addTo(macarte);
+
+                // On s'assure que la France est visible dans son intégralité
+                macarte.fitBounds(L.latLngBounds(FranceBounds));
+
+                // Gestion du groupe qui contient tous les marqueurs et cercles
+                AllFeatureGroup = L.featureGroup();
+                AllFeatureGroup.on('layeradd layerremove', function (e) {
+                    var b = this.getBounds();
+                    if (b.isValid())
+                         macarte.fitBounds(b);
+                     else
+                         macarte.fitBounds(L.latLngBounds(FranceBounds));
+                });
+                AllFeatureGroup.addTo(macarte);
+
+                // Que fait on quand on clique sur la carte
+                macarte.on('click', function(e) {
+                    curpos = [e.latlng.lat, e.latlng.lng];
+                    marker = L.marker(curpos,  {draggable:'false', icon: icons[color_index]}).addTo(macarte);
+
+                    /*marker.on('dragend', function(e){
+                        var marker = e.target;
+                        var position = marker.getLatLng();
+
+                        marker = L.marker(position,  {draggable:'true', icon: icons[color_index]}).addTo(macarte);
+                        var circle = drawCircle(position, R, colors[color_index]);
+                        macarte.removeLayer(e.featureGroup);
+                    });*/
+
+                    circle = drawCircle(curpos, R, colors[color_index]);
+                    color_index ++;
+                    color_index %= 7;
+
+                    // Gestion du click droit sur l'ensemble cercle+marker
+                    feature = L.featureGroup([marker, circle]);
+                    macarte.addLayer(feature);
+                    feature.on('contextmenu', function (e)  { 
+                        macarte.removeLayer(e.target);
+                        AllFeatureGroup.removeLayer(e.target);
+                    });
+                    feature.on('dragstart dragend move', function (e)  { 
+                        console.log(e);
+                    });
+                    // on ajoute le tout à l'ensemble des cercles
+                    feature.addTo(AllFeatureGroup);
+
+                    var tooltiptext = e.latlng.lat.toFixed(6)+", "+e.latlng.lng.toFixed(6);
+                    addGeocode(e.latlng.lat, e.latlng.lng, marker, tooltiptext);
+                    marker.bindTooltip(tooltiptext, { permanent: false, offset: [0, 0] });
+                }); // end macarte.on('click'...
+
+            } // end initMap
+
+            function addGeocode(lat, lng, marker, tooltiptext) {
+                var city = '';
+                $.get('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+lat+'&lon='+lng,
+                function(data){
+                    //console.log(data.address);
+                    if (typeof data.address.town != 'undefined') {
+                        city = data.address.town;
+                    } else if (typeof data.address.village != 'undefined') {
+                        city = data.address.village;
+                    } else if (typeof data.address.city != 'undefined') {
+                        city = data.address.city;
+                    } else if (typeof data.address.municipality != 'undefined') {
+                        city = data.address.municipality;
+                    }
+                    if (city != '') {
+                      tooltiptext = '<center>' + city + '</center>' + tooltiptext;
+                      marker.setTooltipContent(tooltiptext);
+                    }
+                });
+            }
+
+            function drawCircle(pos, rad, colour) {
+                var circle = L.circle(pos, {
+                    //draggable:'true',
+                    color: colour,
+                    fillColor: colour,
+                    fillOpacity: 0.2,
+                    radius: rad
+                    }).addTo(macarte);
+                return circle
+            }
+            
+            window.onload = function(){
+                // Fonction d'initialisation qui s'exécute lorsque le DOM est chargé
+                initMap(); 
+            };
+        </script>
+    </body>
+</html>
